@@ -1,6 +1,7 @@
 use crate::bounding_volume::Aabb;
 use crate::math::{Point, Real, Vector, DIM};
 use alloc::{vec, vec::Vec};
+use bevy_math::ops::{ceil, floor};
 
 /// The primitive shape all voxels from a [`Voxels`] is given.
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -268,7 +269,7 @@ impl Voxels {
                 Point::from(
                     pt.coords
                         .component_div(&voxel_size)
-                        .map(|x| x.floor() as i32),
+                        .map(|x| floor(x) as i32),
                 )
             })
             .collect();
@@ -579,7 +580,7 @@ impl Voxels {
         point
             .coords
             .component_div(&self.voxel_size)
-            .map(|x| x.floor() as i32)
+            .map(|x| floor(x) as i32)
             .into()
     }
 
@@ -627,13 +628,13 @@ impl Voxels {
             .mins
             .coords
             .component_div(&self.voxel_size)
-            .map(|x| x.floor() as i32)
+            .map(|x| floor(x) as i32)
             .sup(&self.domain_mins.coords);
         let maxs = aabb
             .maxs
             .coords
             .component_div(&self.voxel_size)
-            .map(|x| x.ceil() as i32)
+            .map(|x| ceil(x) as i32)
             .inf(&self.domain_maxs.coords);
 
         self.centers_range(mins.into(), maxs.into())
@@ -800,131 +801,131 @@ impl Voxels {
 
 // NOTE: this code is used to generate the constant tables
 // FACES_TO_VOXEL_TYPES, FACES_TO_FEATURE_MASKS, FACES_TO_OCTANT_MASKS.
-#[allow(dead_code)]
-#[cfg(feature = "dim2")]
-#[cfg(test)]
-fn gen_const_tables() {
-    // The `j-th` bit of `faces_adj_to_vtx[i]` is set to 1, if the j-th face of the AABB (based on
-    // the face order depicted in `AABB::FACES_VERTEX_IDS`) is adjacent to the `i` vertex of the AABB
-    // (vertices are indexed as per the diagram depicted in the `FACES_VERTEX_IDS` doc.
-    // Each entry of this will always have exactly 3 bits set.
-    let mut faces_adj_to_vtx = [0usize; 4];
-
-    for fid in 0..4 {
-        let vids = Aabb::FACES_VERTEX_IDS[fid];
-        let key = 1 << fid;
-        faces_adj_to_vtx[vids.0] |= key;
-        faces_adj_to_vtx[vids.1] |= key;
-    }
-
-    /*
-     * FACES_TO_VOXEL_TYPES
-     */
-    std::println!("const FACES_TO_VOXEL_TYPES: [VoxelType; 17] = [");
-    'outer: for i in 0usize..16 {
-        // If any vertex of the voxel has three faces with no adjacent voxels,
-        // then the voxel type is Vertex.
-        for adjs in faces_adj_to_vtx.iter() {
-            if (*adjs & i) == 0 {
-                std::println!("VoxelType::Vertex,");
-                continue 'outer;
-            }
-        }
-
-        // If one face doesn’t have any adjacent voxel,
-        // then the voxel type is Face.
-        for fid in 0..4 {
-            if ((1 << fid) & i) == 0 {
-                std::println!("VoxelType::Face,");
-                continue 'outer;
-            }
-        }
-    }
-
-    // Add final entries for special values.
-    std::println!("VoxelType::Interior,");
-    std::println!("VoxelType::Empty,");
-    std::println!("];");
-
-    /*
-     * FACES_TO_FEATURE_MASKS
-     */
-    std::println!("const FACES_TO_FEATURE_MASKS: [u16; 17] = [");
-    for i in 0usize..16 {
-        // Each bit set indicates a convex vertex that can lead to collisions.
-        // The result will be nonzero only for `VoxelType::Vertex` voxels.
-        let mut vtx_key = 0;
-        for (vid, adjs) in faces_adj_to_vtx.iter().enumerate() {
-            if (*adjs & i) == 0 {
-                vtx_key |= 1 << vid;
-            }
-        }
-
-        if vtx_key != 0 {
-            std::println!("0b{:b},", vtx_key as u16);
-            continue;
-        }
-
-        // Each bit set indicates an exposed face that can lead to collisions.
-        // The result will be nonzero only for `VoxelType::Face` voxels.
-        let mut face_key = 0;
-        for fid in 0..4 {
-            if ((1 << fid) & i) == 0 {
-                face_key |= 1 << fid;
-            }
-        }
-
-        if face_key != 0 {
-            std::println!("0b{:b},", face_key as u16);
-            continue;
-        }
-    }
-
-    std::println!("0b{:b},", u16::MAX);
-    std::println!("0,");
-    std::println!("];");
-
-    /*
-     * Faces to octant masks.
-     */
-    std::println!("const FACES_TO_OCTANT_MASKS: [u32; 17] = [");
-    for i in 0usize..16 {
-        // First test if we have vertices.
-        let mut octant_mask = 0;
-        let mut set_mask = |mask, octant| {
-            // NOTE: we don’t overwrite any mask already set for the octant.
-            if (octant_mask >> (octant * 3)) & 0b0111 == 0 {
-                octant_mask |= mask << (octant * 3);
-            }
-        };
-
-        for (vid, adjs) in faces_adj_to_vtx.iter().enumerate() {
-            if (*adjs & i) == 0 {
-                set_mask(1, vid);
-            }
-        }
-
-        // This is the index of the normal of the faces given by
-        // Aabb::FACES_VERTEX_IDS.
-        const FX: u32 = OctantPattern::FACE_X;
-        const FY: u32 = OctantPattern::FACE_Y;
-        const FACE_NORMALS: [u32; 4] = [FX, FX, FY, FY];
-
-        #[allow(clippy::needless_range_loop)]
-        for fid in 0..4 {
-            if ((1 << fid) & i) == 0 {
-                let vid = Aabb::FACES_VERTEX_IDS[fid];
-                let mask = FACE_NORMALS[fid];
-
-                set_mask(mask, vid.0);
-                set_mask(mask, vid.1);
-            }
-        }
-        std::println!("0b{:b},", octant_mask);
-    }
-    std::println!("0,");
-    std::println!("];");
-}
+// #[allow(dead_code)]
+// #[cfg(feature = "dim2")]
+// #[cfg(test)]
+// fn gen_const_tables() {
+//     // The `j-th` bit of `faces_adj_to_vtx[i]` is set to 1, if the j-th face of the AABB (based on
+//     // the face order depicted in `AABB::FACES_VERTEX_IDS`) is adjacent to the `i` vertex of the AABB
+//     // (vertices are indexed as per the diagram depicted in the `FACES_VERTEX_IDS` doc.
+//     // Each entry of this will always have exactly 3 bits set.
+//     let mut faces_adj_to_vtx = [0usize; 4];
+// 
+//     for fid in 0..4 {
+//         let vids = Aabb::FACES_VERTEX_IDS[fid];
+//         let key = 1 << fid;
+//         faces_adj_to_vtx[vids.0] |= key;
+//         faces_adj_to_vtx[vids.1] |= key;
+//     }
+// 
+//     /*
+//      * FACES_TO_VOXEL_TYPES
+//      */
+//     std::println!("const FACES_TO_VOXEL_TYPES: [VoxelType; 17] = [");
+//     'outer: for i in 0usize..16 {
+//         // If any vertex of the voxel has three faces with no adjacent voxels,
+//         // then the voxel type is Vertex.
+//         for adjs in faces_adj_to_vtx.iter() {
+//             if (*adjs & i) == 0 {
+//                 std::println!("VoxelType::Vertex,");
+//                 continue 'outer;
+//             }
+//         }
+// 
+//         // If one face doesn’t have any adjacent voxel,
+//         // then the voxel type is Face.
+//         for fid in 0..4 {
+//             if ((1 << fid) & i) == 0 {
+//                 std::println!("VoxelType::Face,");
+//                 continue 'outer;
+//             }
+//         }
+//     }
+// 
+//     // Add final entries for special values.
+//     std::println!("VoxelType::Interior,");
+//     std::println!("VoxelType::Empty,");
+//     std::println!("];");
+// 
+//     /*
+//      * FACES_TO_FEATURE_MASKS
+//      */
+//     std::println!("const FACES_TO_FEATURE_MASKS: [u16; 17] = [");
+//     for i in 0usize..16 {
+//         // Each bit set indicates a convex vertex that can lead to collisions.
+//         // The result will be nonzero only for `VoxelType::Vertex` voxels.
+//         let mut vtx_key = 0;
+//         for (vid, adjs) in faces_adj_to_vtx.iter().enumerate() {
+//             if (*adjs & i) == 0 {
+//                 vtx_key |= 1 << vid;
+//             }
+//         }
+// 
+//         if vtx_key != 0 {
+//             std::println!("0b{:b},", vtx_key as u16);
+//             continue;
+//         }
+// 
+//         // Each bit set indicates an exposed face that can lead to collisions.
+//         // The result will be nonzero only for `VoxelType::Face` voxels.
+//         let mut face_key = 0;
+//         for fid in 0..4 {
+//             if ((1 << fid) & i) == 0 {
+//                 face_key |= 1 << fid;
+//             }
+//         }
+// 
+//         if face_key != 0 {
+//             std::println!("0b{:b},", face_key as u16);
+//             continue;
+//         }
+//     }
+// 
+//     std::println!("0b{:b},", u16::MAX);
+//     std::println!("0,");
+//     std::println!("];");
+// 
+//     /*
+//      * Faces to octant masks.
+//      */
+//     std::println!("const FACES_TO_OCTANT_MASKS: [u32; 17] = [");
+//     for i in 0usize..16 {
+//         // First test if we have vertices.
+//         let mut octant_mask = 0;
+//         let mut set_mask = |mask, octant| {
+//             // NOTE: we don’t overwrite any mask already set for the octant.
+//             if (octant_mask >> (octant * 3)) & 0b0111 == 0 {
+//                 octant_mask |= mask << (octant * 3);
+//             }
+//         };
+// 
+//         for (vid, adjs) in faces_adj_to_vtx.iter().enumerate() {
+//             if (*adjs & i) == 0 {
+//                 set_mask(1, vid);
+//             }
+//         }
+// 
+//         // This is the index of the normal of the faces given by
+//         // Aabb::FACES_VERTEX_IDS.
+//         const FX: u32 = OctantPattern::FACE_X;
+//         const FY: u32 = OctantPattern::FACE_Y;
+//         const FACE_NORMALS: [u32; 4] = [FX, FX, FY, FY];
+// 
+//         #[allow(clippy::needless_range_loop)]
+//         for fid in 0..4 {
+//             if ((1 << fid) & i) == 0 {
+//                 let vid = Aabb::FACES_VERTEX_IDS[fid];
+//                 let mask = FACE_NORMALS[fid];
+// 
+//                 set_mask(mask, vid.0);
+//                 set_mask(mask, vid.1);
+//             }
+//         }
+//         std::println!("0b{:b},", octant_mask);
+//     }
+//     std::println!("0,");
+//     std::println!("];");
+// }
 
 // NOTE: this code is used to generate the constant tables
 // FACES_TO_VOXEL_TYPES, FACES_TO_FEATURE_MASKS, FACES_TO_OCTANT_MASKS.
@@ -1427,8 +1428,8 @@ const FACES_TO_OCTANT_MASKS: [u32; 17] = [
 
 #[cfg(test)]
 mod test {
-    #[test]
-    fn gen_const_tables() {
-        super::gen_const_tables();
-    }
+    // #[test]
+    // fn gen_const_tables() {
+    //     super::gen_const_tables();
+    // }
 }

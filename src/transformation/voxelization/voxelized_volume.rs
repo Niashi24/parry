@@ -20,8 +20,10 @@ use crate::bounding_volume::Aabb;
 use crate::math::{Point, Real, Vector, DIM};
 use crate::query;
 use crate::transformation::voxelization::{Voxel, VoxelSet};
-use alloc::sync::Arc;
+use bevy_platform::sync::Arc;
 use alloc::vec::Vec;
+
+use bevy_math::ops::ceil;
 
 /// Controls how the voxelization determines which voxel needs
 /// to be considered empty, and which ones will be considered full.
@@ -163,7 +165,7 @@ impl VoxelizedVolume {
         let aabb = crate::bounding_volume::details::local_point_cloud_aabb(points);
         result.origin = aabb.mins;
         result.resolution = (aabb.extents() / voxel_size)
-            .map(|x| (x.ceil() as u32).max(2) + 1)
+            .map(|x| (ceil(x) as u32).max(2) + 1)
             .into();
 
         result.do_voxelize(points, indices, fill_mode, keep_voxel_to_primitives_map);

@@ -19,7 +19,7 @@
 use crate::math::{Point, Real, Vector, DIM};
 use crate::transformation::vhacd::VHACDParameters;
 use crate::transformation::voxelization::{VoxelSet, VoxelizedVolume};
-use alloc::sync::Arc;
+use bevy_platform::sync::Arc;
 use alloc::vec::Vec;
 
 #[cfg(feature = "dim2")]

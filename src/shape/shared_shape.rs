@@ -15,7 +15,7 @@ use crate::shape::{
 use crate::shape::{Cone, ConvexPolyhedron, Cylinder};
 use crate::transformation::vhacd::{VHACDParameters, VHACD};
 use crate::transformation::voxelization::{FillMode, VoxelSet};
-use alloc::sync::Arc;
+use bevy_platform::sync::Arc;
 use alloc::{vec, vec::Vec};
 use core::fmt;
 use core::ops::Deref;

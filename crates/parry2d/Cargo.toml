@@ -89,6 +89,8 @@ ordered-float = { version = "5", default-features = false }
 log = "0.4"
 thiserror = { version = "2", default-features = false }
 ena = { version = "0.14.3", optional = true, default-features = false }
+bevy_platform = { version = "0.16.0", default-features = false, features = ["alloc"] }
+bevy_math = { version = "0.16.0", default-features = false, features = ["libm"] }
 
 [dev-dependencies]
 simba = { version = "0.9", default-features = false }

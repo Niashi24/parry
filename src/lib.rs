@@ -81,7 +81,7 @@ mod real {
 
     /// The scalar type used throughout this crate.
     #[cfg(feature = "f32")]
-    pub use f32 as Real;
+    pub type Real = f32;
 }
 
 /// Compilation flags dependent aliases for mathematical types.

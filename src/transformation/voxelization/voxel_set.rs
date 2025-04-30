@@ -20,7 +20,7 @@ use super::{FillMode, VoxelizedVolume};
 use crate::bounding_volume::Aabb;
 use crate::math::{Matrix, Point, Real, Vector, DIM};
 use crate::transformation::vhacd::CutPlane;
-use alloc::sync::Arc;
+use bevy_platform::sync::Arc;
 use alloc::{vec, vec::Vec};
 
 #[cfg(feature = "dim2")]
